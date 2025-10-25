@@ -90,7 +90,6 @@ class TopOneClient:
             data = response.json()
 
             if data.get("status") and data.get("status").get("error") is None:
-                self.logger.info(f"Order placed successfully: {data}")
                 return data
             else:
                 message = data.get("status", {}).get("messages", "Unknown error")
