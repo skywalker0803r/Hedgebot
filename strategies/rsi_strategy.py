@@ -30,8 +30,8 @@ def run_rsi_strategy(bitmart_client: BitmartClient, topone_client: TopOneClient,
 
     # --- Configuration for RSI ---
     RSI_PERIOD = 14
-    RSI_OVERBOUGHT = 70
-    RSI_OVERSOLD = 30
+    RSI_OVERBOUGHT = 60
+    RSI_OVERSOLD = 40
     KLINE_INTERVAL = 1 # 1 minute klines
     KLINE_LIMIT = 100 # Fetch last 100 klines (need enough for RSI_PERIOD)
 
@@ -150,8 +150,11 @@ def run_rsi_strategy(bitmart_client: BitmartClient, topone_client: TopOneClient,
     logger.info(f"RSI stats - Min: {rsi_stats['min']:.2f}, Max: {rsi_stats['max']:.2f}, Mean: {rsi_stats['mean']:.2f}")
 
     # --- Check current positions first ---
+    logger.info("Fetching current positions...")
     bitmart_position = bitmart_client.get_position(symbol)
     topone_position = topone_client.get_position(symbol)
+    logger.info(f"Raw Bitmart position: {bitmart_position}")
+    logger.info(f"Raw TopOne position: {topone_position}")
     
     # Determine current position state
     current_bitmart_side = None
@@ -207,6 +210,7 @@ def run_rsi_strategy(bitmart_client: BitmartClient, topone_client: TopOneClient,
         logger.info("No current Bitmart position found.")
     if not current_topone_side:
         logger.info("No current TopOne position found.")
+    logger.info(f"Determined current_bitmart_side: {current_bitmart_side}, current_topone_side: {current_topone_side}")
 
     # --- Determine trading signal ---
     signal = None
@@ -240,6 +244,7 @@ def run_rsi_strategy(bitmart_client: BitmartClient, topone_client: TopOneClient,
         if current_bitmart_side != "short" or current_topone_side != "long":
             need_to_open = True   # Don't have the right positions
 
+    logger.info(f"need_to_close: {need_to_close}, need_to_open: {need_to_open}")
     # If we already have the correct positions, no need to do anything
     if not need_to_close and not need_to_open:
         logger.info("✅ Already have correct positions for current RSI signal. No action needed.")
