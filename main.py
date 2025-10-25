@@ -1,10 +1,11 @@
 import os
 from dotenv import load_dotenv
 from exchanges.bitmart_client import BitmartClient
+from exchanges.topone_client import TopOneClient
 
 load_dotenv()
 
-def open_position(client: BitmartClient):
+def open_position_topone(topone_client: TopOneClient, bitmart_client: BitmartClient):
     try:
         symbol = input("Enter symbol (e.g., BTCUSDT): ")
         side = input("Enter side (long/short): ")
@@ -16,12 +17,13 @@ def open_position(client: BitmartClient):
         print("Invalid input. Please enter correct values.")
         return
 
-    current_price = client.get_current_price(symbol)
+    # Get current price from Bitmart
+    current_price = bitmart_client.get_current_price(symbol)
     if not current_price:
-        print(f"\nFailed to get current price for {symbol}")
+        print(f"Failed to get current price for {symbol} from Bitmart.")
         return
 
-    print(f"Current price of {symbol} is {current_price}")
+    print(f"Current price of {symbol} (from Bitmart) is {current_price}")
     
     if side.lower() == 'long':
         tp_price = current_price * (1 + tp_percentage / 100)
@@ -33,14 +35,13 @@ def open_position(client: BitmartClient):
         print(f"Invalid side: {side}. Please enter 'long' or 'short'.")
         return
 
-    print(f"\n--- Order Summary ---")
+    print(f"\n--- Order Summary (TopOne) ---")
     print(f"Symbol: {symbol}")
     print(f"Side: {side}")
     print(f"Margin: {margin} USDT")
     print(f"Leverage: {leverage}x")
-    # The client will handle the final rounding
-    print(f"Approx. Take Profit: {tp_price:.4f}")
-    print(f"Approx. Stop Loss: {sl_price:.4f}")
+    print(f"Take Profit: {tp_price:.4f}")
+    print(f"Stop Loss: {sl_price:.4f}")
     print("---------------------")
 
     confirm = input("Confirm order? (y/n): ")
@@ -49,7 +50,7 @@ def open_position(client: BitmartClient):
         return
 
     print("\nPlacing order...")
-    order_response = client.place_order(
+    order_response = topone_client.place_order(
         symbol=symbol,
         side=side,
         margin=margin,
@@ -63,32 +64,27 @@ def open_position(client: BitmartClient):
     else:
         print("\nFailed to place order.")
 
-def close_position(client: BitmartClient):
-    symbol = input("Enter symbol to close (e.g., BTCUSDT): ")
-    confirm = input(f"Are you sure you want to close the position for {symbol}? (y/n): ")
-    if confirm.lower() != 'y':
-        print("Close operation cancelled.")
-        return
-
-    print(f"\nClosing position for {symbol}...")
-    response = client.close_position(symbol)
-    if response:
-        print(f"\nClose order placed successfully: {response}")
-    else:
-        print("\nFailed to place close order.")
-
 if __name__ == '__main__':
-    client = BitmartClient(
+    bitmart_client = BitmartClient(
         api_key=os.getenv("BITMART_API_KEY"),
         secret_key=os.getenv("BITMART_SECRET_KEY"),
         memo=os.getenv("BITMART_MEMO")
     )
-    
-    action = input("What do you want to do? (open/close): ")
 
-    if action.lower() == 'open':
-        open_position(client)
-    elif action.lower() == 'close':
-        close_position(client)
+    topone_client = TopOneClient(
+        api_key=os.getenv("TOPONE_API_KEY"),
+        secret_key=os.getenv("TOPONE_SECRET_KEY"),
+    )
+    
+    action = input("What do you want to do? (open_topone/get_balance_topone): ")
+
+    if action.lower() == 'open_topone':
+        open_position_topone(topone_client, bitmart_client)
+    elif action.lower() == 'get_balance_topone':
+        balance = topone_client.get_balance()
+        if balance is not None:
+            print(f"TopOne USDT Available Balance: {balance}")
+        else:
+            print("Failed to get TopOne balance.")
     else:
-        print("Invalid action. Please enter 'open' or 'close'.")
+        print("Invalid action. Please enter 'open_topone' or 'get_balance_topone'.")
