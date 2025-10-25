@@ -24,9 +24,9 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-def run_strategy_continuously(strategy_name: str, interval_seconds: int, max_rounds: int = -1, **strategy_kwargs):
-    logger.info(f"Starting continuous execution of {strategy_name} strategy.")
-    logger.info(f"Polling interval: {interval_seconds} seconds, Max rounds: {max_rounds}")
+def run_strategy_continuously(strategy_name: str, interval_seconds: int, max_rounds: int = -1, progress_file_path: str = None, **strategy_kwargs):
+    logger.info(f"開始持續執行 {strategy_name} 策略。")
+    logger.info(f"輪詢間隔: {interval_seconds} 秒, 最大回合: {max_rounds}")
 
     # Initialize clients
     bitmart_client = BitmartClient(
@@ -45,53 +45,61 @@ def run_strategy_continuously(strategy_name: str, interval_seconds: int, max_rou
         strategy_function_name = f"run_{strategy_name}"
         run_strategy_func = getattr(strategy_module, strategy_function_name)
     except Exception as e:
-        logger.error(f"Error loading strategy {strategy_name}: {e}")
+        logger.error(f"加載策略 {strategy_name} 時出錯: {e}")
         return
 
     round_count = 0
     while True:
         round_count += 1
-        logger.info(f"--- Running round {round_count} for {strategy_name} strategy ---")
+        if progress_file_path:
+            try:
+                with open(progress_file_path, "w") as f:
+                    f.write(str(round_count))
+            except Exception as e:
+                logger.error(f"Error writing progress to file {progress_file_path}: {e}")
+
+        logger.info(f"--- 執行 {strategy_name} 策略 第 {round_count} 回合 ---")
 
         # --- Implement check for insufficient margin ---
         required_margin = strategy_kwargs.get('margin')
         if required_margin is None:
-            logger.error("Strategy parameter 'margin' is missing. Cannot check for insufficient margin.")
+            logger.error("策略參數 'margin' 缺失。無法檢查保證金是否不足。")
             break
 
         bitmart_balance = bitmart_client.get_balance()
         topone_balance = topone_client.get_balance()
 
         if bitmart_balance is None or topone_balance is None:
-            logger.error("Failed to retrieve balance from one or both exchanges. Cannot check for insufficient margin.")
+            logger.error("無法從一個或兩個交易所獲取餘額。無法檢查保證金是否不足。")
             break
 
-        logger.info(f"Bitmart available balance: {bitmart_balance:.2f} USDT, TopOne available balance: {topone_balance:.2f} USDT")
+        logger.info(f"Bitmart 可用餘額: {bitmart_balance:.2f} USDT, TopOne 可用餘額: {topone_balance:.2f} USDT")
 
         if bitmart_balance < required_margin:
-            logger.error(f"Insufficient margin on Bitmart. Required: {required_margin:.2f}, Available: {bitmart_balance:.2f}. Stopping strategy.")
+            logger.error(f"Bitmart 保證金不足。需要: {required_margin:.2f}, 可用: {bitmart_balance:.2f}。停止策略。")
             break
         if topone_balance < required_margin:
-            logger.error(f"Insufficient margin on TopOne. Required: {required_margin:.2f}, Available: {topone_balance:.2f}. Stopping strategy.")
+            logger.error(f"TopOne 保證金不足。需要: {required_margin:.2f}, 可用: {topone_balance:.2f}。停止策略。")
             break
         # --- End of insufficient margin check ---
 
         # Execute the strategy
         results = run_strategy_func(bitmart_client, topone_client, **strategy_kwargs)
-        logger.info(f"Strategy results for round {round_count}: {results}")
+        logger.info(f"第 {round_count} 回合的策略結果: {results}")
 
         # Check stopping conditions
         if max_rounds != -1 and round_count >= max_rounds:
-            logger.info(f"Max rounds ({max_rounds}) reached. Stopping strategy.")
+            logger.info(f"已達到最大回合數 ({max_rounds})。停止策略。")
             break
         
-        logger.info(f"Waiting for {interval_seconds} seconds before next round...")
+        logger.info(f"等待 {interval_seconds} 秒後進入下一回合...")
         time.sleep(interval_seconds)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 2:
         try:
             params_json = sys.argv[1]
+            progress_file_path = sys.argv[2]
             strategy_config = json.loads(params_json)
 
             strategy_to_run = strategy_config["strategy_name"]
@@ -99,8 +107,8 @@ if __name__ == "__main__":
             max_execution_rounds = strategy_config["max_rounds"]
             strategy_params = strategy_config["kwargs"]
 
-            run_strategy_continuously(strategy_to_run, polling_interval, max_execution_rounds, **strategy_params)
+            run_strategy_continuously(strategy_to_run, polling_interval, max_execution_rounds, progress_file_path, **strategy_params)
         except Exception as e:
-            logger.error(f"Error parsing command-line arguments or running strategy: {e}")
+            logger.error(f"解析命令行參數或運行策略時出錯: {e}")
     else:
-        logger.error("No strategy configuration provided. Please run with JSON arguments.")
+        logger.error("未提供策略配置或進度檔案路徑。請使用 JSON 參數和進度檔案路徑運行。")
