@@ -46,6 +46,17 @@ class BitmartClient:
             self.logger.error(f"Failed to get trade fee: {e}")
             return None
 
+    def get_kline_data(self, symbol: str, step: int, start_time: int, end_time: int):
+        try:
+            kline_response = self.futuresAPI.get_kline(symbol, step, start_time, end_time)
+            # kline_response is a tuple, first element is the data
+            # data is {'code': 1000, 'message': 'Ok', 'data': [...], 'trace': '...'}
+            # The actual kline data is in data['data']
+            return kline_response[0]['data']
+        except (APIException, IndexError, KeyError) as e:
+            self.logger.error(f"Failed to get kline data for {symbol}: {e}")
+            return None
+
     def place_order(self, symbol: str, side: str, margin: float, leverage: int, tp_price: float, sl_price: float):
         # 1. Get current price
         current_price = self.get_current_price(symbol)
