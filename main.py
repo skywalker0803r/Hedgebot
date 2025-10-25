@@ -64,6 +64,24 @@ def open_position_topone(topone_client: TopOneClient, bitmart_client: BitmartCli
     else:
         print("\nFailed to place order.")
 
+def close_position_topone(topone_client: TopOneClient):
+    symbol = input("Enter symbol to close (e.g., BTCUSDT): ")
+    confirm = input(f"Are you sure you want to close ALL open positions for {symbol} on TopOne? (y/n): ")
+    if confirm.lower() != 'y':
+        print("Close operation cancelled.")
+        return
+
+    print(f"\nClosing positions for {symbol} on TopOne...")
+    responses = topone_client.close_position(symbol)
+    if responses:
+        for res in responses:
+            if res['status'] == 'success':
+                print(f"Position {res['position_id']} closed successfully: {res['response']}")
+            else:
+                print(f"Failed to close position {res['position_id']}: {res['message']}")
+    else:
+        print("No positions were closed or an error occurred.")
+
 if __name__ == '__main__':
     bitmart_client = BitmartClient(
         api_key=os.getenv("BITMART_API_KEY"),
@@ -76,7 +94,7 @@ if __name__ == '__main__':
         secret_key=os.getenv("TOPONE_SECRET_KEY"),
     )
     
-    action = input("What do you want to do? (open_topone/get_balance_topone): ")
+    action = input("What do you want to do? (open_topone/get_balance_topone/close_topone): ")
 
     if action.lower() == 'open_topone':
         open_position_topone(topone_client, bitmart_client)
@@ -86,5 +104,7 @@ if __name__ == '__main__':
             print(f"TopOne USDT Available Balance: {balance}")
         else:
             print("Failed to get TopOne balance.")
+    elif action.lower() == 'close_topone':
+        close_position_topone(topone_client)
     else:
-        print("Invalid action. Please enter 'open_topone' or 'get_balance_topone'.")
+        print("Invalid action. Please enter 'open_topone', 'get_balance_topone', or 'close_topone'.")

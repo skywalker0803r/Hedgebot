@@ -104,3 +104,71 @@ class TopOneClient:
         except ValueError: 
             self.logger.error("Failed to decode JSON response.")
             return None
+
+    def get_open_positions(self, symbol: str = None):
+        path = "/fapi/v1/position"
+        method = "GET"
+        
+        headers = self._get_signed_headers(method, path)
+        params = {"status": 1} # Filter for open positions
+
+        if symbol:
+            params["pair"] = symbol
+
+        try:
+            response = requests.get(self.base_url + path, headers=headers, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("status") and data.get("status").get("error") is None:
+                return data.get("data", {}).get("list", [])
+            else:
+                message = data.get("status", {}).get("messages", "Unknown error")
+                self.logger.error(f"API error getting open positions: {message}")
+                return None
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Request failed getting open positions: {e}")
+            return None
+        except ValueError:
+            self.logger.error("Failed to decode JSON response getting open positions.")
+            return None
+
+    def close_position(self, symbol: str):
+        open_positions = self.get_open_positions(symbol)
+        if not open_positions:
+            self.logger.info(f"No open positions found for {symbol}.")
+            return None
+
+        results = []
+        for position in open_positions:
+            position_id = position['position_id']
+            quantity = position['quantity'] 
+
+            path = "/fapi/v1/close"
+            method = "POST"
+            headers = self._get_signed_headers(method, path)
+            payload = {
+                "position_id": position_id,
+                "quantity": quantity 
+            }
+
+            try:
+                response = requests.post(self.base_url + path, headers=headers, data=json.dumps(payload))
+                response.raise_for_status()
+                data = response.json()
+
+                if data.get("status") and data.get("status").get("error") is None:
+                    self.logger.info(f"Position {position_id} closed successfully: {data}")
+                    results.append({"position_id": position_id, "status": "success", "response": data})
+                else:
+                    message = data.get("status", {}).get("messages", "Unknown error")
+                    self.logger.error(f"API error closing position {position_id}: {message}")
+                    results.append({"position_id": position_id, "status": "failed", "message": message})
+            except requests.exceptions.RequestException as e:
+                self.logger.error(f"Request failed closing position {position_id}: {e}")
+                results.append({"position_id": position_id, "status": "failed", "message": str(e)})
+            except ValueError:
+                self.logger.error(f"Failed to decode JSON response closing position {position_id}.")
+                results.append({"position_id": position_id, "status": "failed", "message": "Invalid JSON response"})
+        
+        return results
