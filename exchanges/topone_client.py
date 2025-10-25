@@ -136,13 +136,12 @@ class TopOneClient:
         try:
             positions = self.get_open_positions(symbol)
             if positions and len(positions) > 0:
-                # Return the first position for the symbol
-                # Convert TopOne position format to match Bitmart format for compatibility
                 position = positions[0]
+                self.logger.info(f"Raw position data from get_open_positions for {symbol}: {position}")
                 return {
                     'symbol': position.get('pair', symbol),
                     'size': position.get('quantity', '0'),
-                    'side': position.get('direction', 'long'),  # TopOne uses 'direction' field
+                    'side': position.get('side', None),  # TopOne uses 'side' field
                     'position_id': position.get('position_id'),
                     'entry_price': position.get('open_price', '0'),
                     'unrealized_pnl': position.get('unrealized_pnl', '0')
