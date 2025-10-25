@@ -11,7 +11,6 @@ class TopOneClient:
         self.memo = memo
         self.base_url = "https://openapi.top.one"
         self.logger = logging.getLogger(__name__)
-        logging.basicConfig(level=logging.INFO)
 
     def _get_signed_headers(self, method, path):
         timestamp = str(int(time.time() * 1000))

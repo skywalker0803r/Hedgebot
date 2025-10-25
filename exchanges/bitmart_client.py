@@ -5,7 +5,6 @@ from bitmart.lib.cloud_utils import config_logging
 
 class BitmartClient:
     def __init__(self, api_key: str, secret_key: str, memo: str):
-        config_logging(logging, logging.INFO)
         self.logger = logging.getLogger(__name__)
         self.futuresAPI = APIContract(api_key=api_key,
                                       secret_key=secret_key,
