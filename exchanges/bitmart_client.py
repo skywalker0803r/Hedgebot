@@ -108,3 +108,54 @@ class BitmartClient:
         except APIException as error:
             self.logger.error(f"Failed to place order: {error}")
             return None
+
+    def get_position(self, symbol: str):
+        try:
+            position_response = self.futuresAPI.get_position(symbol)
+            positions = position_response[0]['data']
+            for position in positions:
+                if position['symbol'] == symbol:
+                    return position
+            return None
+        except (APIException, IndexError, KeyError) as e:
+            self.logger.error(f"Failed to get position: {e}")
+            return None
+
+    def close_position(self, symbol: str):
+        position = self.get_position(symbol)
+        if not position:
+            self.logger.info(f"No open position found for {symbol}.")
+            return None
+
+        position_type = position['position_type']
+        current_amount = int(position['current_amount'])
+
+        if current_amount == 0:
+            self.logger.info(f"Position for {symbol} has size 0, nothing to close.")
+            return None
+
+        close_side = 0
+        if position_type == 1: # Long position
+            close_side = 3 # sell_close_long
+        elif position_type == 2: # Short position (assuming it's 2, based on buy_close_short)
+            close_side = 2 # buy_close_short
+        else:
+            self.logger.error(f"Unknown position type: {position_type}")
+            return None
+
+        try:
+            leverage = position['leverage']
+            open_type = position['margin_type'].lower()
+
+            response = self.futuresAPI.post_submit_order(
+                contract_symbol=symbol,
+                type="market",
+                side=close_side,
+                size=current_amount,
+                leverage=leverage,
+                open_type=open_type
+            )
+            return response
+        except (APIException, KeyError) as error:
+            self.logger.error(f"Failed to close position: {error}")
+            return None
