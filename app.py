@@ -1,4 +1,3 @@
-import io
 import streamlit as st
 import os
 from dotenv import load_dotenv
@@ -6,10 +5,13 @@ from exchanges.bitmart_client import BitmartClient
 from exchanges.topone_client import TopOneClient
 import time
 import logging
+import io
+import importlib
 
 # Configure logging to capture output
 log_capture_string = io.StringIO()
 stream_handler = logging.StreamHandler(log_capture_string)
+# Set the level for the root logger
 logging.basicConfig(level=logging.INFO, handlers=[stream_handler])
 
 # Load environment variables
@@ -31,100 +33,57 @@ if 'topone_client' not in st.session_state:
 bitmart_client = st.session_state.bitmart_client
 topone_client = st.session_state.topone_client
 
-st.title("Crypto Hedging Strategy")
+st.title("Crypto Trading Strategies")
 
-# Input fields
-symbol = st.text_input("Enter symbol (e.g., BTCUSDT)", "BTCUSDT")
-bitmart_side = st.selectbox("Enter Bitmart side", ("long", "short"))
-margin = st.number_input("Enter margin (USDT) for each exchange", min_value=0.1, value=10.0)
-leverage = st.number_input("Enter leverage", min_value=1, value=14)
-tp_percentage = st.number_input("Enter Take Profit percentage (e.g., 1 for 1%)", min_value=0.01, value=1.0)
-sl_percentage = st.number_input("Enter Stop Loss percentage (e.g., 1 for 1%)", min_value=0.01, value=1.0)
+# --- Strategy Selection ---
+strategy_files = [f for f in os.listdir("strategies") if f.endswith(".py") and f != "__init__.py"]
+strategy_names = [f.replace(".py", "") for f in strategy_files]
+selected_strategy_name = st.selectbox("Select a Strategy", strategy_names)
 
-if st.button("Run Hedge Strategy"):
-    st.subheader("Running Hedge Strategy...")
-    
-    # Determine TopOne side
-    topone_side = "short" if bitmart_side.lower() == "long" else "long"
-
-    # Get current price from Bitmart
-    current_price = bitmart_client.get_current_price(symbol)
-    if not current_price:
-        st.error(f"Failed to get current price for {symbol} from Bitmart.")
-        st.stop()
-
-    st.write(f"Current price of {symbol} (from Bitmart) is {current_price}")
-
-    # Calculate TP/SL for Bitmart
-    if bitmart_side.lower() == 'long':
-        bitmart_tp_price = current_price * (1 + tp_percentage / 100)
-        bitmart_sl_price = current_price * (1 - sl_percentage / 100)
-    else: # short
-        bitmart_tp_price = current_price * (1 - tp_percentage / 100)
-        bitmart_sl_price = current_price * (1 + sl_percentage / 100)
-
-    # Calculate TP/SL for TopOne (opposite side)
-    if topone_side.lower() == 'long':
-        topone_tp_price = current_price * (1 + tp_percentage / 100)
-        topone_sl_price = current_price * (1 - sl_percentage / 100)
-    else: # short
-        topone_tp_price = current_price * (1 - tp_percentage / 100)
-        topone_sl_price = current_price * (1 + sl_percentage / 100)
-
-    st.subheader("Hedge Strategy Summary")
-    st.write(f"Symbol: {symbol}")
-    st.write(f"Bitmart Side: {bitmart_side}, TopOne Side: {topone_side}")
-    st.write(f"Margin per exchange: {margin} USDT, Leverage: {leverage}x")
-    st.write(f"Bitmart TP: {bitmart_tp_price:.4f}, SL: {bitmart_sl_price:.4f}")
-    st.write(f"TopOne TP: {topone_tp_price:.4f}, SL: {topone_sl_price:.4f}")
-
-    st.subheader("Opening Positions...")
-    bitmart_order_response = bitmart_client.place_order(
-        symbol=symbol,
-        side=bitmart_side,
-        margin=margin,
-        leverage=leverage,
-        tp_price=bitmart_tp_price,
-        sl_price=bitmart_sl_price
-    )
-    if bitmart_order_response:
-        st.success(f"Bitmart order placed successfully: {bitmart_order_response}")
-    else:
-        st.error("Failed to place Bitmart order.")
-
-    topone_order_response = topone_client.place_order(
-        symbol=symbol,
-        side=topone_side,
-        margin=margin,
-        leverage=leverage,
-        tp_price=topone_tp_price,
-        sl_price=topone_sl_price
-    )
-    if topone_order_response:
-        st.success(f"TopOne order placed successfully: {topone_order_response}")
-    else:
-        st.error("Failed to place TopOne order.")
-
-    if not bitmart_order_response and not topone_order_response:
-        st.warning("No orders were placed. Exiting strategy.")
-    else:
-        st.info("Holding positions for 1 minute...")
-        time.sleep(60)
-
-        st.subheader("Closing Positions...")
-        bitmart_close_response = bitmart_client.close_position(symbol)
-        if bitmart_close_response:
-            st.success(f"Bitmart position closed successfully: {bitmart_close_response}")
+# Dynamically import the selected strategy
+run_strategy_func = None
+if selected_strategy_name:
+    try:
+        strategy_module = importlib.import_module(f"strategies.{selected_strategy_name}")
+        # Assuming each strategy file has a function named 'run_<strategy_name>_strategy'
+        strategy_function_name = f"run_{selected_strategy_name}"
+        if hasattr(strategy_module, strategy_function_name):
+            run_strategy_func = getattr(strategy_module, strategy_function_name)
         else:
-            st.error("Failed to close Bitmart position.")
+            st.error(f"Strategy function '{strategy_function_name}' not found in '{selected_strategy_name}.py')")
+    except Exception as e:
+        st.error(f"Error loading strategy {selected_strategy_name}: {e}")
+else:
+    st.info("Please select a strategy.")
 
-        topone_close_response = topone_client.close_position(symbol)
-        if topone_close_response:
-            st.success(f"TopOne position closed successfully: {topone_close_response}")
-        else:
-            st.error("Failed to close TopOne position.")
+# --- Common Input Fields for Strategies ---
+st.sidebar.header("Common Strategy Parameters")
+symbol = st.sidebar.text_input("Symbol (e.g., BTCUSDT)", "BTCUSDT")
+bitmart_side = st.sidebar.selectbox("Bitmart Side", ("long", "short"))
+margin = st.sidebar.number_input("Margin (USDT) per exchange", min_value=0.1, value=10.0)
+leverage = st.sidebar.number_input("Leverage", min_value=1, value=14)
+tp_percentage = st.sidebar.number_input("Take Profit %", min_value=0.01, value=1.0)
+sl_percentage = st.sidebar.number_input("Stop Loss %", min_value=0.01, value=1.0)
 
-    st.subheader("Hedge Strategy Completed!")
+# --- Run Strategy Button ---
+if st.button("Run Selected Strategy"):
+    if run_strategy_func:
+        st.subheader(f"Executing {selected_strategy_name} Strategy...")
+        
+        # Prepare common kwargs to pass to the strategy function
+        common_kwargs = {
+            "symbol": symbol,
+            "bitmart_side": bitmart_side,
+            "margin": margin,
+            "leverage": leverage,
+            "tp_percentage": tp_percentage,
+            "sl_percentage": sl_percentage,
+        }
+
+        # Call the selected strategy function
+        run_strategy_func(bitmart_client, topone_client, **common_kwargs)
+    else:
+        st.warning("Please select a valid strategy before running.")
 
 # Display captured logs
 with st.expander("View Logs"):
