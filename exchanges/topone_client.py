@@ -131,6 +131,29 @@ class TopOneClient:
             self.logger.error("Failed to decode JSON response getting open positions.")
             return None
 
+    def get_position(self, symbol: str):
+        """Get position for specific symbol (compatible with BitmartClient.get_position)"""
+        try:
+            positions = self.get_open_positions(symbol)
+            if positions and len(positions) > 0:
+                # Return the first position for the symbol
+                # Convert TopOne position format to match Bitmart format for compatibility
+                position = positions[0]
+                return {
+                    'symbol': position.get('pair', symbol),
+                    'size': position.get('quantity', '0'),
+                    'side': position.get('direction', 'long'),  # TopOne uses 'direction' field
+                    'position_id': position.get('position_id'),
+                    'entry_price': position.get('open_price', '0'),
+                    'unrealized_pnl': position.get('unrealized_pnl', '0')
+                }
+            else:
+                self.logger.info(f"No open position found for {symbol}.")
+                return None
+        except Exception as e:
+            self.logger.error(f"Failed to get position for {symbol}: {e}")
+            return None
+
     def close_position(self, symbol: str):
         open_positions = self.get_open_positions(symbol)
         if not open_positions:
