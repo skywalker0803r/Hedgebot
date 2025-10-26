@@ -78,7 +78,7 @@ class TopOneClient:
             "side": api_side,
             "position_side": api_position_side,
             "leverage": leverage,
-            "margin_mode": 1, 
+            "margin_mode": 1, #逐倉
             "margin": str(margin),
             "take_profit_price": str(tp_price),
             "stop_loss_price": str(sl_price),

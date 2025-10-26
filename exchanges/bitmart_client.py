@@ -90,7 +90,7 @@ class BitmartClient:
             self.futuresAPI.post_submit_leverage(
                 contract_symbol=symbol,
                 leverage=str(leverage),
-                open_type="isolated"
+                open_type="isolated" #逐倉
             )
         except APIException as error:
             self.logger.error(f"Failed to set leverage: {error}")
