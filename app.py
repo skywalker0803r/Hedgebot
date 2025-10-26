@@ -17,7 +17,7 @@ import tempfile # For temporary file creation
 # This is for the Streamlit app's own logs, not the backend service's logs
 log_capture_string_app = io.StringIO()
 stream_handler_app = logging.StreamHandler(log_capture_string_app)
-logging.basicConfig(level=logging.INFO, handlers=[stream_handler_app], force=True) 
+logging.basicConfig(level=logging.INFO, handlers=[stream_handler_app], force=True,encoding='utf-8') 
 logger_app = logging.getLogger(__name__)
 
 # --- Environment Variables ---
