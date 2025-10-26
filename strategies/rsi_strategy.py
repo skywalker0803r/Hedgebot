@@ -300,8 +300,8 @@ def run_rsi_strategy(bitmart_client: BitmartClient, topone_client: TopOneClient,
         bitmart_sl_price = current_price * (1 - sl_percentage / 100)
         
         # Calculate TP/SL for TopOne (opposite side)
-        topone_tp_price = current_price * (1 - tp_percentage / 100)
-        topone_sl_price = current_price * (1 + sl_percentage / 100)
+        topone_tp_price = bitmart_sl_price #current_price * (1 - tp_percentage / 100)
+        topone_sl_price = bitmart_tp_price #current_price * (1 + sl_percentage / 100)
 
         logger.info("--- RSI Oversold Signal ---")
         logger.info(f"Symbol: {symbol}")
