@@ -54,15 +54,15 @@ st.sidebar.header("策略參數")
 symbol = st.sidebar.text_input("交易對 (例如: XRPUSDT)", "XRPUSDT")
 bitmart_side = st.sidebar.selectbox("Bitmart 方向", ("long", "short"))
 margin = st.sidebar.number_input("每交易所保證金 (USDT)", min_value=0.1, value=1.0)
-leverage = st.sidebar.number_input("槓桿", min_value=1, value=14)
-tp_percentage = st.sidebar.number_input("止盈 %", min_value=0.01, value=1.0)
-sl_percentage = st.sidebar.number_input("止損 %", min_value=0.01, value=1.0)
+leverage = st.sidebar.number_input("槓桿", min_value=1, value=69)
+tp_percentage = st.sidebar.number_input("止盈 %", min_value=0.01, value=0.2)
+sl_percentage = st.sidebar.number_input("止損 %", min_value=0.01, value=2.0)
 
 # --- Backend Control Parameters ---
 st.sidebar.header("後端控制")
 polling_interval = st.sidebar.number_input("輪詢間隔 (秒)", min_value=10, value=60)
 countdown_placeholder = st.sidebar.empty()
-max_execution_rounds = st.sidebar.number_input("最大執行回合數 (-1 為無限)", min_value=-1, value=5)
+max_execution_rounds = st.sidebar.number_input("最大執行回合數 (-1 為無限)", min_value=-1, value=-1)
 progress_bar_placeholder = st.sidebar.empty()
 
 # --- Backend Control Parameters ---
