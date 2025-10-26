@@ -143,7 +143,7 @@ def stop_backend():
 def update_backend_logs():
     if st.session_state.backend_log_placeholder:
         try:
-            with open("backend_logs.txt", "r") as f:
+            with open("backend_logs.txt", "r",encoding="utf-8") as f:
                 logs = f.read()
                 st.session_state.backend_log_placeholder.code(logs)
         except FileNotFoundError:

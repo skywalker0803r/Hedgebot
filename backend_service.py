@@ -15,10 +15,9 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
     handlers=[
-        logging.FileHandler(log_file_path, mode='w'), 
+        logging.FileHandler(log_file_path, mode='w',encoding='utf-8'), 
         logging.StreamHandler() 
-    ],
-    encoding='utf-8',
+    ]
 )
 logger = logging.getLogger(__name__)
 
