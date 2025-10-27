@@ -60,7 +60,7 @@ sl_percentage = st.sidebar.number_input("止損 %", min_value=0.01, value=1.0)
 
 # --- Backend Control Parameters ---
 st.sidebar.header("後端控制")
-polling_interval = st.sidebar.number_input("輪詢間隔 (秒)", min_value=10, value=60)
+polling_interval = st.sidebar.number_input("輪詢間隔 (秒)", min_value=10, value=180)
 countdown_placeholder = st.sidebar.empty()
 max_execution_rounds = st.sidebar.number_input("最大執行回合數 (-1 為無限)", min_value=-1, value=-1)
 progress_bar_placeholder = st.sidebar.empty()

@@ -30,9 +30,9 @@ def run_rsi_strategy(bitmart_client: BitmartClient, topone_client: TopOneClient,
 
     # --- Configuration for RSI ---
     RSI_PERIOD = 14
-    RSI_OVERBOUGHT = 60
-    RSI_OVERSOLD = 40
-    KLINE_INTERVAL = 1 # 1 minute klines
+    RSI_OVERBOUGHT = 70
+    RSI_OVERSOLD = 30
+    KLINE_INTERVAL = 3 # 3 minute klines
     KLINE_LIMIT = 100 # Fetch last 100 klines (need enough for RSI_PERIOD)
 
     # --- Fetch K-line data from Bitmart ---
