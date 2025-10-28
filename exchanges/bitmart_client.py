@@ -126,6 +126,7 @@ class BitmartClient:
             for position in positions:
                 if position['symbol'] == symbol:
                     return position
+            self.logger.info(f"No open position found for {symbol}.")
             return None
         except (APIException, IndexError, KeyError) as e:
             self.logger.error(f"Failed to get position: {e}")

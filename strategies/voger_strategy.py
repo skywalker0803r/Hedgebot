@@ -20,8 +20,8 @@ def cci(df, period=20):
 # ---------- Signal Generation ----------
 def signal_generation(df, cci_len=20, lookback_bars=5, pullback_len=5, pullback_pct=0.01):
     df['CCI'] = cci(df, cci_len)
-    df['TrendUp'] = df['CCI'] >= 0
-    df['TrendUpPrev'] = df['TrendUp'].shift(1)
+    df['TrendUp'] = (df['CCI'] >= 0).astype(bool)
+    df['TrendUpPrev'] = df['TrendUp'].shift(1).fillna(False).astype(bool)
 
     df['PrevHigh'] = df['Close'].shift(1).rolling(lookback_bars).max()
     df['PrevLow']  = df['Close'].shift(1).rolling(lookback_bars).min()
@@ -86,9 +86,39 @@ def run_voger_strategy(bitmart_client: BitmartClient, topone_client: TopOneClien
     }
 
     # 1. Fetch Data and Generate Signals
-    df_15m = bitmart_client.get_kline_dataframe(symbol, 15, 200)
-    if df_15m is None or df_15m.empty:
-        results.update({"message": "Failed to fetch 15m k-line data.", "status": "failed"})
+    end_time = int(time.time())
+    start_time = end_time - 200 * 15 * 60
+    kline_data = bitmart_client.get_kline_data(symbol, 15, start_time, end_time)
+
+    if not kline_data:
+        results.update({"message": f"Failed to fetch 15m k-line data for {symbol}.", "status": "failed"})
+        logger.error(results["message"])
+        return results
+
+    # Process K-line data (handle both list of dicts and list of lists)
+    if isinstance(kline_data[0], dict):
+        processed_data = []
+        for kline in kline_data:
+            processed_data.append([
+                kline.get('timestamp'),
+                kline.get('open_price'),
+                kline.get('high_price'),
+                kline.get('low_price'),
+                kline.get('close_price'),
+                kline.get('volume')
+            ])
+        df_15m = pd.DataFrame(processed_data, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
+    else:
+        df_15m = pd.DataFrame(kline_data, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
+
+    # Convert data types
+    for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+        df_15m[col] = pd.to_numeric(df_15m[col], errors='coerce')
+    df_15m['timestamp'] = pd.to_datetime(df_15m['timestamp'], unit='s', errors='coerce')
+    df_15m.dropna(inplace=True)
+
+    if df_15m.empty:
+        results.update({"message": f"K-line data for {symbol} was empty or could not be processed.", "status": "failed"})
         logger.error(results["message"])
         return results
 
@@ -147,8 +177,8 @@ def run_voger_strategy(bitmart_client: BitmartClient, topone_client: TopOneClien
             tp_sl = bm_tp
 
         logger.info(f"Placing orders: Bitmart={desired_bitmart_side}, TopOne={topone_side}")
-        bm_order = bitmart_client.place_order(symbol, margin, leverage, desired_bitmart_side, tp_price=bm_tp, sl_price=bm_sl)
-        tp_order = topone_client.place_order(symbol, margin, leverage, topone_side, tp_price=tp_tp, sl_price=tp_sl)
+        bm_order = bitmart_client.place_order(symbol, desired_bitmart_side, margin, leverage, tp_price=bm_tp, sl_price=bm_sl)
+        tp_order = topone_client.place_order(symbol, topone_side, margin, leverage, tp_price=tp_tp, sl_price=tp_sl)
         results.update({"bitmart_order": bm_order, "topone_order": tp_order, "status": "completed", "message": f"Opened {desired_bitmart_side} hedge."})
     
     elif not need_to_close and not need_to_open:
