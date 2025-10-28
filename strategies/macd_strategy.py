@@ -9,7 +9,7 @@ from exchanges.topone_client import TopOneClient
 
 logger = logging.getLogger(__name__)
 
-def run_macd_strategy(bitmart_client: BitmartClient, topone_client: ToponeClient, **kwargs):
+def run_macd_strategy(bitmart_client: BitmartClient, topone_client: TopOneClient, **kwargs):
     logger.info("Running MACD Strategy...")
 
     symbol = kwargs.get('symbol')
