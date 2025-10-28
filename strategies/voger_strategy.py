@@ -86,14 +86,14 @@ def run_voger_strategy(bitmart_client: BitmartClient, topone_client: TopOneClien
     }
 
     # 1. Fetch Data and Generate Signals
-    df_5m = bitmart_client.get_kline_dataframe(symbol, 5, 200)
-    if df_5m is None or df_5m.empty:
-        results.update({"message": "Failed to fetch 5m k-line data.", "status": "failed"})
+    df_15m = bitmart_client.get_kline_dataframe(symbol, 15, 200)
+    if df_15m is None or df_15m.empty:
+        results.update({"message": "Failed to fetch 15m k-line data.", "status": "failed"})
         logger.error(results["message"])
         return results
 
-    df_5m = signal_generation(df_5m.copy())
-    latest_signal = df_5m.iloc[-1]
+    df_15m = signal_generation(df_15m.copy())
+    latest_signal = df_15m.iloc[-1]
     long_signal = latest_signal['LongSignal']
     short_signal = latest_signal['ShortSignal']
 
@@ -132,7 +132,7 @@ def run_voger_strategy(bitmart_client: BitmartClient, topone_client: TopOneClien
 
     if need_to_open:
         topone_side = "short" if desired_bitmart_side == "long" else "long"
-        current_price = df_5m['Close'].iloc[-1]
+        current_price = df_15m['Close'].iloc[-1]
         
         # Calculate TP/SL
         if desired_bitmart_side == 'long':
