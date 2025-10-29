@@ -33,6 +33,15 @@ def run_hedge_strategy(bitmart_client: BitmartClient, topone_client: TopOneClien
         results["message"] = f"Invalid Bitmart side: {bitmart_side}."
         return results
 
+    # --- Position Check ---
+    bitmart_pos = bitmart_client.get_position(symbol)
+    topone_pos = topone_client.get_position(symbol)
+    if (bitmart_pos and bitmart_pos.get('side')) or (topone_pos and topone_pos.get('side')):
+        logger.info(f"Existing position found for {symbol}. Bitmart: {bitmart_pos}, TopOne: {topone_pos}. Skipping hedge strategy.")
+        results["status"] = "skipped"
+        results["message"] = "Existing position found. Strategy skipped to avoid multiple positions."
+        return results
+
     # Get current price from Bitmart
     current_price = bitmart_client.get_current_price(symbol)
     if not current_price:

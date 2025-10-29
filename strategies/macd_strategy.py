@@ -92,6 +92,15 @@ def run_macd_strategy(bitmart_client: BitmartClient, topone_client: TopOneClient
     logger.info(f"Current price for order execution: {current_price}")
 
     if signal == "golden_cross":
+        # --- Position Check before opening ---
+        bitmart_pos = bitmart_client.get_position(symbol)
+        topone_pos = topone_client.get_position(symbol)
+        if (bitmart_pos and bitmart_pos.get('side')) or (topone_pos and topone_pos.get('side')):
+            logger.info(f"Golden cross detected, but a position already exists for {symbol}. No action taken.")
+            results["status"] = "skipped"
+            results["message"] = "Golden cross detected, but position already exists."
+            return results
+
         # Open long on Bitmart, short on TopOne
         bitmart_side = "long"
         topone_side = "short"
