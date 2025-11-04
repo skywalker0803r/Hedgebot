@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import time
 import config
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +27,19 @@ def signal_generation(df, cci_len=20, lookback_bars=5, pullback_len=5, pullback_
     df['LongSignal'], df['ShortSignal'] = False, False
 
     if debug_mode:
-        # In debug mode, generate frequent alternating signals for the latest bar
-        # This will ensure a signal is always present for the most recent data point
-        if (len(df) - 1) % 2 == 0: # Alternate long and short signals on the latest bar
-            df.at[len(df) - 1, 'LongSignal'] = True
-            df.at[len(df) - 1, 'ShortSignal'] = False
-        else:
-            df.at[len(df) - 1, 'ShortSignal'] = True
-            df.at[len(df) - 1, 'LongSignal'] = False
+        # In debug mode, randomly generate long, short, or no signal for the latest bar
+        signal_choice = random.choice(['long', 'short', 'none'])
+        latest_bar_index = len(df) - 1
+
+        if signal_choice == 'long':
+            df.at[latest_bar_index, 'LongSignal'] = True
+            df.at[latest_bar_index, 'ShortSignal'] = False
+        elif signal_choice == 'short':
+            df.at[latest_bar_index, 'ShortSignal'] = True
+            df.at[latest_bar_index, 'LongSignal'] = False
+        else: # 'none'
+            df.at[latest_bar_index, 'LongSignal'] = False
+            df.at[latest_bar_index, 'ShortSignal'] = False
         return df
 
     bull_trigger = bear_trigger = None
@@ -111,10 +117,16 @@ def run_voger_strategy(bitmart_client, topone_client, **kwargs):
 
     # --- 決策方向 ---
     desired = None
-    if long_signal and overall_trend != '空頭':
-        desired = 'long'
-    elif short_signal and overall_trend != '多頭':
-        desired = 'short'
+    if config.DEBUG_MODE:
+        if long_signal:
+            desired = 'long'
+        elif short_signal:
+            desired = 'short'
+    else: # Original logic
+        if long_signal and overall_trend != '空頭':
+            desired = 'long'
+        elif short_signal and overall_trend != '多頭':
+            desired = 'short'
 
     if not desired:
         msg = "無新訊號" if any(positions.values()) else "無持倉與新訊號"
