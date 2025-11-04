@@ -26,14 +26,14 @@ def signal_generation(df, cci_len=20, lookback_bars=5, pullback_len=5, pullback_
     df['LongSignal'], df['ShortSignal'] = False, False
 
     if debug_mode:
-        # In debug mode, generate frequent alternating signals
-        for i in range(len(df)):
-            if i % 4 == 0: # Every 4 bars, generate a long signal
-                df.at[i, 'LongSignal'] = True
-                df.at[i, 'ShortSignal'] = False
-            elif i % 4 == 2: # Every 4 bars, generate a short signal
-                df.at[i, 'ShortSignal'] = True
-                df.at[i, 'LongSignal'] = False
+        # In debug mode, generate frequent alternating signals for the latest bar
+        # This will ensure a signal is always present for the most recent data point
+        if (len(df) - 1) % 2 == 0: # Alternate long and short signals on the latest bar
+            df.at[len(df) - 1, 'LongSignal'] = True
+            df.at[len(df) - 1, 'ShortSignal'] = False
+        else:
+            df.at[len(df) - 1, 'ShortSignal'] = True
+            df.at[len(df) - 1, 'LongSignal'] = False
         return df
 
     bull_trigger = bear_trigger = None
