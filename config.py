@@ -19,3 +19,6 @@ PULLBACK_PCT = 0.01      # 用於回調觸發的百分比（1%）
 
 # 策略執行頻率（秒）
 EXECUTION_INTERVAL_SECONDS = 60  # 每隔幾秒執行一次策略
+
+# Debug Mode
+DEBUG_MODE = False

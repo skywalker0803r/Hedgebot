@@ -2,6 +2,7 @@ import logging
 import pandas as pd
 import numpy as np
 import time
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -13,16 +14,27 @@ def cci(df, period=20):
     return (tp - ma) / (0.015 * md + 1e-9)
 
 # ---------- 產生交易訊號 ----------
-def signal_generation(df, cci_len=20, lookback_bars=5, pullback_len=5, pullback_pct=0.01):
+def signal_generation(df, cci_len=20, lookback_bars=5, pullback_len=5, pullback_pct=0.01, debug_mode=False):
     df['CCI'] = cci(df, cci_len)
     df['TrendUp'] = df['CCI'] >= 0
-    df['TrendUpPrev'] = df['TrendUp'].shift(1).fillna(False)
+    df['TrendUpPrev'] = df['TrendUp'].shift(1).astype(bool).fillna(False)
     df['PrevHigh'] = df['Close'].shift(1).rolling(lookback_bars).max()
     df['PrevLow'] = df['Close'].shift(1).rolling(lookback_bars).min()
 
     df['BullCross'] = (~df['TrendUpPrev']) & df['TrendUp'] & (df['Close'] > df['PrevHigh'])
     df['BearCross'] = df['TrendUpPrev'] & (~df['TrendUp']) & (df['Close'] < df['PrevLow'])
     df['LongSignal'], df['ShortSignal'] = False, False
+
+    if debug_mode:
+        # In debug mode, generate frequent alternating signals
+        for i in range(len(df)):
+            if i % 4 == 0: # Every 4 bars, generate a long signal
+                df.at[i, 'LongSignal'] = True
+                df.at[i, 'ShortSignal'] = False
+            elif i % 4 == 2: # Every 4 bars, generate a short signal
+                df.at[i, 'ShortSignal'] = True
+                df.at[i, 'LongSignal'] = False
+        return df
 
     bull_trigger = bear_trigger = None
     bull_count = bear_count = 0
@@ -57,7 +69,7 @@ def load_kline_df(client, symbol, interval, bars):
     if isinstance(data[0], dict):
         data = [[k['timestamp'], k['open_price'], k['high_price'], k['low_price'], k['close_price'], k['volume']] for k in data]
     df = pd.DataFrame(data, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
-    df = df.apply(pd.to_numeric, errors='ignore')
+    df = df.apply(lambda x: pd.to_numeric(x, errors='coerce'))
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s', errors='coerce')
     return df.dropna()
 
@@ -81,7 +93,7 @@ def run_voger_strategy(bitmart_client, topone_client, **kwargs):
     if df_15m is None or df_15m.empty:
         return {**results, "status": "failed", "message": f"{symbol} 無法取得15分K線"}
 
-    df_15m = signal_generation(df_15m, lookback_bars=lookback_bars, pullback_pct=pullback_pct)
+    df_15m = signal_generation(df_15m, lookback_bars=lookback_bars, pullback_pct=pullback_pct, debug_mode=config.DEBUG_MODE)
     latest = df_15m.iloc[-1]
     long_signal, short_signal = latest['LongSignal'], latest['ShortSignal']
 
