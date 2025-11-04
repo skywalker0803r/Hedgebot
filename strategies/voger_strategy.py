@@ -162,10 +162,23 @@ def run_voger_strategy(bitmart_client, topone_client, **kwargs):
     topone_has_position = positions["topone"] is not None
     any_open_positions = bitmart_has_position or topone_has_position
 
+    # Get current position summaries for comparison
+    bitmart_pos_summary = get_position_summary(positions["bitmart"])
+    topone_pos_summary = get_position_summary(positions["topone"])
+
+    # Check if existing positions already form a valid hedge aligned with the desired signal
+    should_skip_closing = False
+    if desired == 'long' and bitmart_pos_summary == '多頭' and topone_pos_summary == '空頭':
+        should_skip_closing = True
+        logger.info("Existing positions already form a desired LONG hedge. Skipping closing.")
+    elif desired == 'short' and bitmart_pos_summary == '空頭' and topone_pos_summary == '多頭':
+        should_skip_closing = True
+        logger.info("Existing positions already form a desired SHORT hedge. Skipping closing.")
+
     # If a signal is generated, and there are any open positions, close them all first.
-    # This ensures "平倉一起平" (close together)
-    if desired is not None and any_open_positions:
-        logger.info("Signal detected and open positions exist. Attempting to close all positions first.")
+    # This ensures "平倉一起平" (close together) unless already in desired hedged state.
+    if desired is not None and any_open_positions and not should_skip_closing:
+        logger.info("Signal detected and open positions exist, but not in desired hedged state. Attempting to close all positions first.")
         if bitmart_has_position:
             bitmart_client.close_position(symbol)
             logger.info("Bitmart position closed.")
