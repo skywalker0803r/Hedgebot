@@ -10,8 +10,8 @@ TOPONE_SECRET_KEY = "你的_TOPONE_SECRET_KEY"
 
 # 策略參數設定
 SYMBOL = "ETH_USDT"      # 交易對
-MARGIN = 10              # 每筆交易的保證金金額
-LEVERAGE = 15            # 槓桿倍數
+MARGIN = 5              # 每筆交易的保證金金額
+LEVERAGE = 1            # 槓桿倍數
 TP_PERCENTAGE = 2.0      # 止盈百分比（%）
 SL_PERCENTAGE = 1.0      # 止損百分比（%）
 LOOKBACK_BARS = 5        # 用於訊號產生的回看K線數量
