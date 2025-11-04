@@ -137,7 +137,7 @@ class TopOneClient:
             positions = self.get_open_positions(symbol)
             if positions and len(positions) > 0:
                 position = positions[0]
-                self.logger.info(f"Raw position data from get_open_positions for {symbol}: {position}")
+                #self.logger.info(f"Raw position data from get_open_positions for {symbol}: {position}")
                 return {
                     'symbol': position.get('pair', symbol),
                     'size': position.get('quantity', '0'),

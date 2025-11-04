@@ -7,6 +7,10 @@ import random
 
 logger = logging.getLogger(__name__)
 
+# Global variables for debug signal sequence
+_debug_signal_sequence_counter = 0
+_debug_signal_sequence = ['none', 'long', 'none', 'none', 'short', 'none', 'none', 'long']
+
 # ---------- CCI 指標 ----------
 def cci(df, period=20):
     tp = (df['High'] + df['Low'] + df['Close']) / 3
@@ -27,19 +31,23 @@ def signal_generation(df, cci_len=20, lookback_bars=5, pullback_len=5, pullback_
     df['LongSignal'], df['ShortSignal'] = False, False
 
     if debug_mode:
-        # In debug mode, randomly generate long, short, or no signal for the latest bar
-        signal_choice = random.choice(['long', 'short', 'none'])
+        global _debug_signal_sequence_counter
+        global _debug_signal_sequence
+
+        signal_choice = _debug_signal_sequence[_debug_signal_sequence_counter % len(_debug_signal_sequence)]
+        _debug_signal_sequence_counter += 1
+
         latest_bar_index = len(df) - 1
+
+        df.at[latest_bar_index, 'LongSignal'] = False
+        df.at[latest_bar_index, 'ShortSignal'] = False
 
         if signal_choice == 'long':
             df.at[latest_bar_index, 'LongSignal'] = True
-            df.at[latest_bar_index, 'ShortSignal'] = False
         elif signal_choice == 'short':
             df.at[latest_bar_index, 'ShortSignal'] = True
-            df.at[latest_bar_index, 'LongSignal'] = False
-        else: # 'none'
-            df.at[latest_bar_index, 'LongSignal'] = False
-            df.at[latest_bar_index, 'ShortSignal'] = False
+
+        logger.info(f"DEBUG MODE: Generated signal: {signal_choice}")
         return df
 
     bull_trigger = bear_trigger = None
@@ -85,6 +93,27 @@ def prepare_order_params(side, price, tp_pct, sl_pct):
     else:
         return price * (1 - tp_pct/100), price * (1 + sl_pct/100)
 
+def get_position_summary(position):
+    logger.debug(f"get_position_summary received position: {position}")
+    if position is None:
+        return "無持倉"
+    
+    # Check for TopOne's 'side' field
+    side = position.get('side')
+    if side == 'long':
+        return "多頭"
+    elif side == 'short':
+        return "空頭"
+
+    # Check for Bitmart's 'position_type' field
+    position_type = position.get('position_type')
+    if position_type == 1: # 1 for long
+        return "多頭"
+    elif position_type == 2: # 2 for short
+        return "空頭"
+
+    return "未知持倉"
+
 # ---------- 策略主流程 ----------
 def run_voger_strategy(bitmart_client, topone_client, **kwargs):
     symbol = kwargs['symbol']
@@ -113,7 +142,7 @@ def run_voger_strategy(bitmart_client, topone_client, **kwargs):
         "bitmart": bitmart_client.get_position(symbol),
         "topone": topone_client.get_position(symbol)
     }
-    logger.info(f"持倉: Bitmart={positions['bitmart']}, TopOne={positions['topone']}")
+    logger.info(f"持倉狀況: Bitmart={get_position_summary(positions['bitmart'])}, TopOne={get_position_summary(positions['topone'])}")
 
     # --- 決策方向 ---
     desired = None
@@ -128,41 +157,73 @@ def run_voger_strategy(bitmart_client, topone_client, **kwargs):
         elif short_signal and overall_trend != '多頭':
             desired = 'short'
 
+    # Determine if any positions are currently open
+    bitmart_has_position = positions["bitmart"] is not None
+    topone_has_position = positions["topone"] is not None
+    any_open_positions = bitmart_has_position or topone_has_position
+
+    # If a signal is generated, and there are any open positions, close them all first.
+    # This ensures "平倉一起平" (close together)
+    if desired is not None and any_open_positions:
+        logger.info("Signal detected and open positions exist. Attempting to close all positions first.")
+        if bitmart_has_position:
+            bitmart_client.close_position(symbol)
+            logger.info("Bitmart position closed.")
+        if topone_has_position:
+            topone_client.close_position(symbol)
+            logger.info("TopOne position closed.")
+        time.sleep(5) # Wait for positions to close
+
+        # After closing, re-fetch positions to ensure they are indeed closed
+        positions["bitmart"] = bitmart_client.get_position(symbol)
+        positions["topone"] = topone_client.get_position(symbol)
+        bitmart_has_position = positions["bitmart"] is not None
+        topone_has_position = positions["topone"] is not None
+        any_open_positions = bitmart_has_position or topone_has_position
+
+        if any_open_positions:
+            logger.warning("Failed to close all positions. Aborting current cycle.")
+            return {**results, "status": "failed_to_close", "message": "未能平倉所有部位"}
+
+
+    # If no signal, or if all positions were just closed and no new signal to open
     if not desired:
-        msg = "無新訊號" if any(positions.values()) else "無持倉與新訊號"
+        msg = "無新訊號" if any_open_positions else "無持倉與新訊號"
         return {**results, "status": "no_action", "message": msg}
 
     opposite = 'short' if desired == 'long' else 'long'
 
-    # --- 檢查是否需平倉 ---
-    def need_close(cur, new): return cur and cur.get('side') != new
-
-    close_actions = {
-        "bitmart": need_close(positions["bitmart"], desired),
-        "topone": need_close(positions["topone"], opposite)
-    }
-
-    for name, need in close_actions.items():
-        if need:
-            client = bitmart_client if name == 'bitmart' else topone_client
-            res = client.close_position(symbol)
-            results[f"{name}_close"] = res
-            logger.info(f"{name} 平倉結果: {res}")
-    if any(close_actions.values()):
-        time.sleep(10)
-
     # --- 開倉 ---
-    price = df_15m['Close'].iloc[-1]
-    bm_tp, bm_sl = prepare_order_params(desired, price, tp_pct, sl_pct)
-    tp_tp, tp_sl = bm_sl, bm_tp  # 對沖
+    # This ensures "開倉一起開" (open together)
+    # Only attempt to open if no positions are currently open after potential closing
+    if not bitmart_has_position and not topone_has_position:
+        price = df_15m['Close'].iloc[-1]
+        bm_tp, bm_sl = prepare_order_params(desired, price, tp_pct, sl_pct)
+        tp_tp, tp_sl = bm_sl, bm_tp  # 對沖
 
-    orders = {}
-    if not positions["bitmart"]:
-        orders["bitmart_order"] = bitmart_client.place_order(symbol, desired, margin, leverage, tp_price=bm_tp, sl_price=bm_sl)
-    if not positions["topone"]:
-        orders["topone_order"] = topone_client.place_order(symbol, opposite, margin, leverage, tp_price=tp_tp, sl_price=tp_sl)
+        orders = {}
+        bitmart_order_res = bitmart_client.place_order(symbol, desired, margin, leverage, tp_price=bm_tp, sl_price=bm_sl)
+        topone_order_res = topone_client.place_order(symbol, opposite, margin, leverage, tp_price=tp_tp, sl_price=tp_sl)
 
-    results.update(orders)
-    results["status"] = "completed"
-    results["message"] = f"Bitmart開{desired}倉，TopOne開{opposite}倉對沖。"
+        if bitmart_order_res and topone_order_res:
+            orders["bitmart_order"] = bitmart_order_res
+            orders["topone_order"] = topone_order_res
+            results.update(orders)
+            results["status"] = "completed"
+            results["message"] = f"Bitmart開{desired}倉，TopOne開{opposite}倉對沖。"
+        else:
+            results["status"] = "failed_to_open"
+            results["message"] = "未能同時開倉"
+            # If one failed, consider closing the other if it opened
+            if bitmart_order_res and not topone_order_res:
+                logger.warning("Bitmart opened, but TopOne failed. Attempting to close Bitmart position.")
+                bitmart_client.close_position(symbol)
+            elif topone_order_res and not bitmart_order_res:
+                logger.warning("TopOne opened, but Bitmart failed. Attempting to close TopOne position.")
+                topone_client.close_position(symbol)
+    else:
+        results["status"] = "no_action"
+        results["message"] = "已有部位，不重複開倉"
+
+
     return results
