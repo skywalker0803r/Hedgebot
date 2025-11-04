@@ -1,12 +1,17 @@
 # config.py
 
-# 交易所 API 憑證（請替換為你實際的 API Key）
-BITMART_API_KEY = "YOUR_BITMART_API_KEY"
-BITMART_SECRET_KEY = "YOUR_BITMART_SECRET_KEY"
-BITMART_MEMO = "YOUR_BITMART_MEMO"  # 可選，若 Bitmart 需要則填入
+import os
+from dotenv import load_dotenv
 
-TOPONE_API_KEY = "YOUR_TOPONE_API_KEY"
-TOPONE_SECRET_KEY = "YOUR_TOPONE_SECRET_KEY"
+load_dotenv()
+
+# 交易所 API 憑證
+BITMART_API_KEY = os.getenv("BITMART_API_KEY")
+BITMART_SECRET_KEY = os.getenv("BITMART_SECRET_KEY")
+BITMART_MEMO = os.getenv("BITMART_MEMO")  # 可選，若 Bitmart 需要則填入
+
+TOPONE_API_KEY = os.getenv("TOPONE_API_KEY")
+TOPONE_SECRET_KEY = os.getenv("TOPONE_SECRET_KEY")
 
 # 策略參數設定
 SYMBOL = "ETHUSDT"      # 交易對
